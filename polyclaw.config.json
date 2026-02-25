@@ -1,0 +1,45 @@
+{
+  "mode": "mock",
+
+  "mock": {
+    "starting_balance": 1000.0,
+    "slippage_bps": 10
+  },
+
+  "polymarket": {
+    "host": "https://clob.polymarket.com",
+    "chain_id": 137,
+    "private_key_env": "POLYCLAW_PRIVATE_KEY",
+    "funder_env": "POLYCLAW_FUNDER_ADDRESS",
+    "signature_type": 1
+  },
+
+  "streaming": {
+    "enabled": true,
+    "channels": ["market", "rtds"],
+    "auto_subscribe_top_n": 50,
+    "reconnect_delay_ms": 1000,
+    "reconnect_max_delay_ms": 30000,
+    "rtds_crypto_symbols": ["btcusdt", "ethusdt", "solusdt"]
+  },
+
+  "risk": {
+    "max_position_size": 50.0,
+    "max_open_positions": 10,
+    "max_daily_trades": 20,
+    "min_confidence": 0.6
+  },
+
+  "filters": {
+    "min_volume_24hr": 1000,
+    "min_liquidity": 5000,
+    "tags_include": [],
+    "tags_exclude": []
+  },
+
+  "database": {
+    "path": "./data/polyclaw.db"
+  },
+
+  "log_level": "INFO"
+}
