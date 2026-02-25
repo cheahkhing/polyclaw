@@ -47,7 +47,8 @@ polyclaw/
 ├── requirements-dev.txt
 ├── setup.py
 └── skill/
-    └── SKILL.md                # OpenClaw skill definition
+    └── polyclaw/
+        └── SKILL.md            # OpenClaw skill definition
 ```
 
 ---
@@ -297,7 +298,7 @@ python -m pytest tests/ --cov=polyclaw --cov-report=term-missing
 
 ## OpenClaw Integration
 
-Polyclaw includes a skill package in the `skill/` directory. See [skill/SKILL.md](skill/SKILL.md) for the full skill definition.
+Polyclaw includes a skill package in the `skill/polyclaw/` directory. See [skill/polyclaw/SKILL.md](skill/polyclaw/SKILL.md) for the full skill definition.
 
 ---
 
