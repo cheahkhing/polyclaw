@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Polyclaw — Run History{% endblock %}
+
+{% block content %}
+<h3>Simulation Runs</h3>
+
+{% if runs %}
+<table role="grid">
+    <thead>
+        <tr>
+            <th>Run ID</th>
+            <th>Strategy</th>
+            <th>Started</th>
+            <th>Ended</th>
+            <th>Status</th>
+            <th>Notes</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for run in runs %}
+        <tr>
+            <td><code>{{ run.run_id }}</code></td>
+            <td>{{ run.strategy }}</td>
+            <td>{{ run.started_at[:19] }}</td>
+            <td>{{ run.ended_at[:19] if run.ended_at else '—' }}</td>
+            <td>
+                {% if run.status == 'completed' %}
+                    <span style="color: var(--pico-color-green-500);">✓ {{ run.status }}</span>
+                {% elif run.status == 'running' %}
+                    <span style="color: var(--pico-color-blue-500);">▶ {{ run.status }}</span>
+                {% else %}
+                    {{ run.status }}
+                {% endif %}
+            </td>
+            <td>{{ run.notes or '—' }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p style="color: var(--pico-muted-color);">No simulation runs yet. Start one from the <a href="/">Monitor</a> page.</p>
+{% endif %}
+{% endblock %}

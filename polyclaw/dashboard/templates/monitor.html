@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}Polyclaw — Simulation Dashboard{% endblock %}
+
+{% block content %}
+<!-- ═══════════════════════════════════════════════════════════
+     Phase 1 — SCAN
+     ═══════════════════════════════════════════════════════════ -->
+<section id="phase-scan">
+    <article>
+        <header>
+            <div class="grid" style="align-items: center;">
+                <div>
+                    <strong style="font-size: 1.1rem;">① Scan Markets</strong>
+                    <span style="margin-left: 0.5rem; color: var(--pico-muted-color);">
+                        Find trading candidates using strategy filters
+                    </span>
+                </div>
+                <div style="text-align: right;">
+                    <select id="scan-strategy" style="display: inline-block; width: auto; margin: 0;">
+                        {% for s in strategies %}
+                        <option value="{{ s.name }}" {% if s.name == 'sports_volatility' %}selected{% endif %}>
+                            {{ s.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <button id="btn-scan" onclick="doScan()">🔍 Scan Markets</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Scan results -->
+        <div id="scan-status" style="text-align: center; padding: 2rem; color: var(--pico-muted-color);">
+            Click <strong>Scan Markets</strong> to fetch and filter live Polymarket events.
+        </div>
+
+        <div id="scan-results" style="display: none;">
+            <div style="margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                <span>
+                    <strong id="scan-count">0</strong> candidates found
+                    · <span id="scan-selected-count">0</span> selected
+                </span>
+                <span>
+                    <button class="outline secondary" onclick="toggleSelectAll()" style="padding: 0.3rem 0.8rem; font-size: 0.8rem;">
+                        Select / Deselect All
+                    </button>
+                </span>
+            </div>
+            <div style="max-height: 450px; overflow-y: auto;">
+                <table role="grid" id="candidates-table" style="font-size: 0.8rem;">
+                    <thead>
+                        <tr>
+                            <th style="width: 2rem;"><input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this)"></th>
+                            <th>Score</th>
+                            <th>Event / Market</th>
+                            <th>Price</th>
+                            <th>Spread</th>
+                            <th>Volume 24h</th>
+                            <th>Resolves In</th>
+                            <th>Reasoning</th>
+                        </tr>
+                    </thead>
+                    <tbody id="candidates-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </article>
+
+    <!-- Start Monitoring -->
+    <div id="start-monitoring-bar" style="text-align: center; display: none;">
+        <button id="btn-start-monitoring" onclick="startMonitoring()" class="contrast"
+                style="font-size: 1rem; padding: 0.6rem 2rem;">
+            ▶ Start Monitoring Selected Markets
+        </button>
+    </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     Phase 2 — MONITOR
+     ═══════════════════════════════════════════════════════════ -->
+<section id="phase-monitor" style="display: none;">
+    <!-- Status Bar -->
+    <div id="status-bar" class="grid" style="margin-bottom: 1rem; align-items: center;">
+        <div>
+            <span id="sim-status-badge" class="badge idle">IDLE</span>
+            <span id="sim-run-id" style="margin-left: 0.5rem; color: var(--pico-muted-color);">—</span>
+        </div>
+        <div style="text-align: center;">
+            <span id="sim-strategy">—</span> ·
+            Tick: <span id="sim-tick">0</span> ·
+            Watching: <span id="watchlist-count">0</span> markets
+        </div>
+        <div style="text-align: right;">
+            <button class="outline secondary" onclick="backToScan()" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">← Back to Scan</button>
+            <button id="btn-pause" class="outline secondary" onclick="pauseSim()" disabled>⏸ Pause</button>
+            <button id="btn-stop" class="outline contrast" onclick="stopSim()" disabled>⏹ Stop</button>
+        </div>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="grid" id="stats-bar" style="margin-bottom: 1rem;">
+        <article style="padding: 0.75rem; margin: 0;">
+            <small>Balance</small>
+            <div id="stat-balance" class="stat-value">$1,000.00</div>
+        </article>
+        <article style="padding: 0.75rem; margin: 0;">
+            <small>Unrealized P&amp;L</small>
+            <div id="stat-unrealized" class="stat-value">$0.00</div>
+        </article>
+        <article style="padding: 0.75rem; margin: 0;">
+            <small>Trades</small>
+            <div id="stat-trades" class="stat-value">0</div>
+        </article>
+        <article style="padding: 0.75rem; margin: 0;">
+            <small>Open Positions</small>
+            <div id="stat-positions" class="stat-value">0</div>
+        </article>
+    </div>
+
+    <!-- Main Content -->
+    <div class="grid" style="grid-template-columns: 1fr 1fr;">
+        <!-- Left Column -->
+        <div>
+            <!-- Watched Markets -->
+            <article>
+                <header>
+                    <strong>Watched Markets</strong>
+                    <span id="watched-count" style="float: right; color: var(--pico-muted-color);">0</span>
+                </header>
+                <div id="watched-list" style="max-height: 320px; overflow-y: auto; font-size: 0.85rem;">
+                    <p style="color: var(--pico-muted-color);">No markets selected yet.</p>
+                </div>
+            </article>
+
+            <!-- Positions Panel -->
+            <article>
+                <header><strong>Open Positions</strong></header>
+                <div id="positions-list" style="max-height: 260px; overflow-y: auto;">
+                    <table role="grid" style="font-size: 0.8rem;">
+                        <thead>
+                            <tr>
+                                <th>Market</th>
+                                <th>Side</th>
+                                <th>Entry</th>
+                                <th>Current</th>
+                                <th>Size</th>
+                                <th>P&amp;L</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positions-tbody">
+                            <tr><td colspan="6" style="color: var(--pico-muted-color);">No positions</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </article>
+        </div>
+
+        <!-- Right Column -->
+        <div>
+            <!-- Price Chart -->
+            <article>
+                <header><strong>Equity Curve</strong></header>
+                <div id="equity-chart" style="height: 250px;"></div>
+            </article>
+
+            <!-- Trade Feed -->
+            <article>
+                <header>
+                    <strong>Trade Feed</strong>
+                    <span id="trade-feed-count" style="float: right; color: var(--pico-muted-color);">0</span>
+                </header>
+                <div id="trade-feed" style="max-height: 300px; overflow-y: auto; font-size: 0.8rem;">
+                    <p style="color: var(--pico-muted-color);">Waiting for trades...</p>
+                </div>
+            </article>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const WS_URL = "{{ ws_url }}";
+const INITIAL_STATE = {{ state | tojson }};
+
+document.addEventListener('DOMContentLoaded', () => {
+    initApp(WS_URL, INITIAL_STATE);
+});
+</script>
+{% endblock %}

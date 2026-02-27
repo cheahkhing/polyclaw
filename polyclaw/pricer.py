@@ -34,6 +34,10 @@ class PriceEngine:
                 self.host,
                 chain_id=self.config.polymarket.chain_id,
             )
+            # Set a shorter timeout on the internal session to avoid
+            # blocking the tick loop for too long
+            if hasattr(self._clob_client, "session"):
+                self._clob_client.session.timeout = 5
             logger.info("CLOB client initialised (read-only)")
         except Exception as exc:
             logger.warning("py-clob-client unavailable, using REST fallback: %s", exc)
@@ -126,7 +130,12 @@ class PriceEngine:
         return 0.0
 
     def get_midpoints_batch(self, token_ids: list[str]) -> dict[str, float]:
-        """Return midpoint prices for multiple tokens."""
+        """Return midpoint prices for multiple tokens.
+
+        Uses the SDK's ``get_order_books`` for a single HTTP call.
+        The SDK returns ``OrderBookSummary`` objects (not dicts), so we
+        use ``getattr`` to read attributes safely.
+        """
         result: dict[str, float] = {}
         if self._clob_client:
             try:
@@ -137,11 +146,20 @@ class PriceEngine:
                 )
                 if isinstance(books, list):
                     for book in books:
-                        asset_id = book.get("asset_id", "")
-                        mid = book.get("midpoint") or book.get("mid")
+                        # Handle both dict-like and object-like responses
+                        if isinstance(book, dict):
+                            asset_id = book.get("asset_id", "")
+                            mid = book.get("midpoint") or book.get("mid")
+                        else:
+                            asset_id = getattr(book, "asset_id", "")
+                            mid = getattr(book, "midpoint", None) or getattr(book, "mid", None)
                         if asset_id and mid is not None:
-                            result[asset_id] = float(mid)
-                    return result
+                            try:
+                                result[asset_id] = float(mid)
+                            except (TypeError, ValueError):
+                                continue
+                    if result:
+                        return result
             except Exception as exc:
                 logger.warning("Batch midpoint via SDK failed: %s", exc)
 

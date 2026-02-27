@@ -75,6 +75,24 @@ class DatabaseConfig:
 
 
 @dataclass
+class SimConfig:
+    """Simulation-specific configuration."""
+    default_tick_interval_seconds: int = 30
+    default_duration_minutes: int = 240
+    snapshot_every_n_ticks: int = 10
+    record_prices: bool = True
+    price_db_path: str = "./data/price_history.db"
+
+
+@dataclass
+class DashboardConfig:
+    """Web dashboard configuration."""
+    host: str = "127.0.0.1"
+    port: int = 8420
+    auto_open_browser: bool = True
+
+
+@dataclass
 class PolyclawConfig:
     """Root configuration object."""
 
@@ -85,6 +103,9 @@ class PolyclawConfig:
     risk: RiskConfig = field(default_factory=RiskConfig)
     filters: FiltersConfig = field(default_factory=FiltersConfig)
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
+    simulation: SimConfig = field(default_factory=SimConfig)
+    dashboard: DashboardConfig = field(default_factory=DashboardConfig)
+    strategies: dict = field(default_factory=dict)
     log_level: str = "INFO"
 
 
@@ -96,7 +117,7 @@ def _apply_dict(obj: Any, data: dict) -> None:
         current = getattr(obj, key)
         if isinstance(current, (MockConfig, PolymarketConfig, StreamingConfig,
                                 RiskConfig, FiltersConfig,
-                                DatabaseConfig)):
+                                DatabaseConfig, SimConfig, DashboardConfig)):
             if isinstance(value, dict):
                 _apply_dict(current, value)
         else:

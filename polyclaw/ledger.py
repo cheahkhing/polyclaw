@@ -13,6 +13,7 @@ from polyclaw.models import (
     MockTradeResult,
     PortfolioSnapshot,
     Position,
+    SimRun,
     TradeSignal,
 )
 from polyclaw.utils.logging import get_logger
@@ -73,6 +74,16 @@ CREATE INDEX IF NOT EXISTS idx_trades_market ON trades(market_id);
 CREATE INDEX IF NOT EXISTS idx_trades_strategy ON trades(strategy);
 CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status);
 CREATE INDEX IF NOT EXISTS idx_positions_market ON positions(market_id);
+
+CREATE TABLE IF NOT EXISTS sim_runs (
+    run_id          TEXT PRIMARY KEY,
+    strategy        TEXT NOT NULL,
+    started_at      TEXT NOT NULL,
+    ended_at        TEXT,
+    config_snapshot  TEXT NOT NULL,
+    status          TEXT DEFAULT 'running',
+    notes           TEXT DEFAULT ''
+);
 """
 
 
@@ -86,7 +97,7 @@ class TradeLedger:
         # Ensure directory exists
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
 
-        self._conn = sqlite3.connect(path)
+        self._conn = sqlite3.connect(path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(SCHEMA)
         self._conn.commit()
@@ -412,3 +423,61 @@ class TradeLedger:
                 "pnl": float(r["total_pnl"]),
             }
         return stats
+
+    # ------------------------------------------------------------------
+    # Simulation Runs
+    # ------------------------------------------------------------------
+
+    def save_sim_run(self, run: SimRun) -> None:
+        """Insert or update a simulation run record."""
+        self._conn.execute(
+            """INSERT OR REPLACE INTO sim_runs
+            (run_id, strategy, started_at, ended_at, config_snapshot, status, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                run.run_id,
+                run.strategy,
+                run.started_at,
+                run.ended_at,
+                run.config_snapshot,
+                run.status,
+                run.notes,
+            ),
+        )
+        self._conn.commit()
+
+    def get_sim_runs(self, limit: int = 50) -> list[SimRun]:
+        """Return recent simulation runs."""
+        rows = self._conn.execute(
+            "SELECT * FROM sim_runs ORDER BY started_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [
+            SimRun(
+                run_id=r["run_id"],
+                strategy=r["strategy"],
+                started_at=r["started_at"],
+                ended_at=r["ended_at"],
+                config_snapshot=r["config_snapshot"],
+                status=r["status"],
+                notes=r["notes"] or "",
+            )
+            for r in rows
+        ]
+
+    def get_sim_run(self, run_id: str) -> SimRun | None:
+        """Return a specific simulation run."""
+        row = self._conn.execute(
+            "SELECT * FROM sim_runs WHERE run_id = ?", (run_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return SimRun(
+            run_id=row["run_id"],
+            strategy=row["strategy"],
+            started_at=row["started_at"],
+            ended_at=row["ended_at"],
+            config_snapshot=row["config_snapshot"],
+            status=row["status"],
+            notes=row["notes"] or "",
+        )

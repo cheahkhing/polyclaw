@@ -399,6 +399,139 @@ def balance(ctx: click.Context) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Simulation commands
+# ---------------------------------------------------------------------------
+
+
+@main.group()
+@click.pass_context
+def sim(ctx: click.Context) -> None:
+    """Simulation commands — run, list, export, replay."""
+    pass
+
+
+@sim.command(name="run")
+@click.option("--strategy", default="sports_volatility", help="Strategy name to use")
+@click.option("--duration", default=None, type=int, help="Duration in minutes (overrides config)")
+@click.option("--tick", default=None, type=int, help="Tick interval in seconds (overrides config)")
+@click.pass_context
+def sim_run(ctx: click.Context, strategy: str, duration: int | None, tick: int | None) -> None:
+    """Run the simulation in headless (CLI) mode."""
+    cfg = _get_config(ctx)
+
+    from polyclaw.simulator import SimScheduler
+    from polyclaw.event_bus import EventBus
+
+    bus = EventBus()
+
+    # Simple console listener
+    def on_event(evt):
+        console.print(f"[dim]{evt.timestamp}[/dim] [{evt.type}] {evt.data}")
+
+    bus.subscribe("*", on_event)
+
+    scheduler = SimScheduler(cfg, bus)
+    if tick:
+        cfg.simulation.default_tick_interval_seconds = tick
+    if duration:
+        cfg.simulation.default_duration_minutes = duration
+
+    console.print(f"[bold green]Starting simulation[/bold green] — strategy={strategy}, mode={cfg.mode}")
+    scheduler.start(strategy_name=strategy)
+
+    try:
+        import time
+        while scheduler._running:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        console.print("[yellow]Stopping...[/yellow]")
+        scheduler.stop()
+    console.print("[bold]Simulation finished.[/bold]")
+
+
+@sim.command(name="list")
+@click.pass_context
+def sim_list(ctx: click.Context) -> None:
+    """List past simulation runs."""
+    cfg = _get_config(ctx)
+
+    from polyclaw.ledger import TradeLedger
+
+    ledger = TradeLedger(cfg)
+    runs = ledger.get_sim_runs()
+    ledger.close()
+
+    if not runs:
+        console.print("[yellow]No simulation runs found.[/yellow]")
+        return
+
+    from rich.table import Table
+
+    table = Table(title="Simulation Runs")
+    table.add_column("Run ID", style="cyan")
+    table.add_column("Strategy")
+    table.add_column("Started")
+    table.add_column("Status")
+    table.add_column("Notes")
+
+    for r in runs:
+        table.add_row(r.run_id[:12], r.strategy, r.started_at or "", r.status, r.notes or "")
+
+    console.print(table)
+
+
+@sim.command(name="export")
+@click.option("--run-id", default=None, help="Run ID to export (latest if omitted)")
+@click.option("--format", "fmt", default="csv", type=click.Choice(["csv", "json", "markdown"]))
+@click.option("--output", "output_dir", default="./data/exports", help="Output directory")
+@click.pass_context
+def sim_export(ctx: click.Context, run_id: str | None, fmt: str, output_dir: str) -> None:
+    """Export simulation results to CSV/JSON/Markdown."""
+    cfg = _get_config(ctx)
+
+    from polyclaw.exporter import SimExporter
+    from polyclaw.ledger import TradeLedger
+
+    ledger = TradeLedger(cfg)
+    exporter = SimExporter(ledger)
+
+    path = exporter.export(run_id=run_id, format=fmt, output_dir=output_dir)
+    ledger.close()
+
+    console.print(f"[green]Exported to {path}[/green]")
+
+
+# ---------------------------------------------------------------------------
+# Dashboard command
+# ---------------------------------------------------------------------------
+
+
+@main.command()
+@click.option("--host", default=None, help="Dashboard host (default: 127.0.0.1)")
+@click.option("--port", default=None, type=int, help="Dashboard port (default: 8420)")
+@click.option("--no-browser", is_flag=True, help="Don't open browser automatically")
+@click.pass_context
+def dashboard(ctx: click.Context, host: str | None, port: int | None, no_browser: bool) -> None:
+    """Launch the simulation web dashboard."""
+    cfg = _get_config(ctx)
+
+    if host:
+        cfg.dashboard.host = host
+    if port:
+        cfg.dashboard.port = port
+    if no_browser:
+        cfg.dashboard.auto_open_browser = False
+
+    from polyclaw.dashboard.app import run_dashboard
+
+    console.print(
+        f"[bold green]Starting dashboard[/bold green] at "
+        f"http://{cfg.dashboard.host}:{cfg.dashboard.port}"
+    )
+    run_dashboard(cfg)
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 

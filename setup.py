@@ -14,6 +14,10 @@ setup(
         "click>=8.0",
         "python-dotenv>=1.0",
         "rich>=13.0",
+        "fastapi>=0.110.0",
+        "uvicorn[standard]>=0.27.0",
+        "jinja2>=3.1.0",
+        "python-multipart>=0.0.7",
     ],
     extras_require={
         "dev": [

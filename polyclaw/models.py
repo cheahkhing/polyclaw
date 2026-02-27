@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Any, Literal
 
 
 # ---------------------------------------------------------------------------
@@ -162,3 +162,38 @@ class EvaluationReport:
     unrealized_pnl: float = 0.0
     strategy_breakdown: dict[str, dict] = field(default_factory=dict)
     portfolio_balance: float = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Simulation models
+# ---------------------------------------------------------------------------
+
+@dataclass
+class SimRun:
+    """Metadata for a single simulation run."""
+
+    run_id: str = ""
+    strategy: str = ""
+    started_at: str = ""
+    ended_at: str | None = None
+    config_snapshot: str = ""  # JSON dump of full config at start
+    status: str = "running"    # running | paused | completed | aborted
+    notes: str = ""
+
+
+@dataclass
+class RiskVerdict:
+    """Result of a pre-trade risk check."""
+
+    approved: bool = True
+    reason: str = ""
+    signal: TradeSignal | None = None
+
+
+@dataclass
+class SimEvent:
+    """An event pushed through the EventBus to the dashboard."""
+
+    type: str = ""        # tick, trade_executed, price_update, etc.
+    timestamp: str = ""   # ISO 8601
+    data: dict[str, Any] = field(default_factory=dict)
